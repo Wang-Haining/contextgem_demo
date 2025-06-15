@@ -14,11 +14,13 @@ This pipeline supports local fully-private deployment.
 
 Usage:
 ```bash
-# init backend llama3.1
-python -m vllm.entrypoints.openai.api_server \
-  --model meta-llama/Llama-3.1-8B-Instruct \
-  --tensor-parallel-size 1 \
-  --port 8000
+# init backend llama3.1 (on a v100)
+python3 -m vllm.entrypoints.openai.api_server \
+    --model meta-llama/Llama-3.1-8B-Instruct \
+    --dtype float16 \
+    --tensor-parallel-size 1 \
+    --max-model-len 16384
+
 ```
 
 """
