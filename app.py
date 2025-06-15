@@ -25,14 +25,15 @@ python3 -m vllm.entrypoints.openai.api_server \
 
 """
 
-__author__ = 'hw56@iu.edu'
-__version__ = '0.0.1'
-__license__ = 'MIT'
+__author__ = "hw56@iu.edu"
+__version__ = "0.0.1"
+__license__ = "MIT"
 
 
+import fitz
 import gradio as gr
-import fitz  # pymupdf for robust pdf parsing
 from contextgem import Document, DocumentLLM, JsonObjectConcept
+from pydantic import conint
 
 
 def parse_pdf(pdf_file):
@@ -47,10 +48,10 @@ staging_concept = JsonObjectConcept(
     name="ABC_Staging",
     description="Extract NIA‑AA ABC score: A (Aβ plaques), B (Braak stage), C (CERAD) and overall likelihood.",
     structure={
-        "A": {"type": "integer", "minimum": 0, "maximum": 3},
-        "B": {"type": "integer", "minimum": 0, "maximum": 3},
-        "C": {"type": "integer", "minimum": 0, "maximum": 3},
-        "likelihood": {"type": "string"}
+        "A": conint(ge=0, le=3),
+        "B": conint(ge=0, le=3),
+        "C": conint(ge=0, le=3),
+        "likelihood": str,
     },
     add_references=True,
     reference_depth="sentences",
@@ -63,14 +64,7 @@ staging_concept = JsonObjectConcept(
 anat_concept = JsonObjectConcept(
     name="Anatomical_Entities",
     description="List anatomical structures with FMA ID and description.",
-    structure={
-        "type": "array",
-        "items": {
-            "term": {"type": "string"},
-            "fma_id": {"type": "string"},
-            "description": {"type": "string"}
-        }
-    },
+    structure={"type": list, "items": {"term": str, "fma_id": str, "description": str}},
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
@@ -83,20 +77,14 @@ asymmetry_concept = JsonObjectConcept(
     name="Anatomical_Asymmetries",
     description="Extract all mentions of anatomical asymmetries (left vs right, hemisphere differences, side-specific findings).",
     structure={
-        "type": "array",
-        "items": {
-            "structure": {"type": "string"},
-            "left": {"type": "string"},
-            "right": {"type": "string"},
-            "comment": {"type": "string"}
-        }
+        "type": list,
+        "items": {"structure": str, "left": str, "right": str, "comment": str},
     },
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
     justification_depth="brief",
 )
-
 
 
 def extract_concepts(pdf_file, show_prompt=False):
@@ -116,7 +104,7 @@ def extract_concepts(pdf_file, show_prompt=False):
         model="llm-dummy",  # label only (ContextGem never uses this value to control routing)
         api_key="sk-dummy",  # dummy (required by ContextGem's OpenAI interface wrapper)
         api_base="http://localhost:8000/v1",  # local vLLM API endpoint
-        model_type="openai"  # use OpenAI-compatible chat completion format for llama3.1
+        model_type="openai",  # use OpenAI-compatible chat completion format for llama3.1
     )
 
     # run extraction
@@ -180,7 +168,7 @@ gr.Interface(
     fn=extract_concepts,
     inputs=[
         gr.File(label="upload neuropathology pdf"),
-        gr.Checkbox(label="show llm prompt chain", value=False)
+        gr.Checkbox(label="show llm prompt chain", value=False),
     ],
     outputs=gr.Textbox(label="extraction result", lines=40),
     title="Demo: Neuropathology Report Concept Extraction",
@@ -188,5 +176,5 @@ gr.Interface(
         "upload a neuropathology report pdf. "
         "extract nia-aa abc staging, anatomical structures, and anatomical asymmetries "
         "using contextgem with llama 3.1-8b instruct served locally via vllm."
-    )
+    ),
 ).launch()
