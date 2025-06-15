@@ -33,7 +33,6 @@ __license__ = "MIT"
 import fitz
 import gradio as gr
 from contextgem import Document, DocumentLLM, JsonObjectConcept
-from pydantic import conint
 
 
 def parse_pdf(pdf_file):
@@ -48,16 +47,17 @@ staging_concept = JsonObjectConcept(
     name="ABC_Staging",
     description="Extract NIA‑AA ABC score: A (Aβ plaques), B (Braak stage), C (CERAD) and overall likelihood.",
     structure={
-        "A": conint(ge=0, le=3),
-        "B": conint(ge=0, le=3),
-        "C": conint(ge=0, le=3),
-        "likelihood": str,
+        "A": int,
+        "B": int,
+        "C": int,
+        "likelihood": str
     },
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
     justification_depth="brief",
 )
+
 
 
 # define extraction concept: anatomical entities
