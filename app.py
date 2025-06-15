@@ -64,27 +64,39 @@ staging_concept = JsonObjectConcept(
 anat_concept = JsonObjectConcept(
     name="Anatomical_Entities",
     description="List anatomical structures with FMA ID and description.",
-    structure={"type": list, "items": {"term": str, "fma_id": str, "description": str}},
+    structure=[
+        {
+            "term": str,
+            "fma_id": str,
+            "description": str
+        }
+    ],
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
     justification_depth="brief",
 )
+
 
 
 # define extraction concept: anatomical asymmetries
 asymmetry_concept = JsonObjectConcept(
     name="Anatomical_Asymmetries",
     description="Extract all mentions of anatomical asymmetries (left vs right, hemisphere differences, side-specific findings).",
-    structure={
-        "type": list,
-        "items": {"structure": str, "left": str, "right": str, "comment": str},
-    },
+    structure=[
+        {
+            "structure": str,
+            "left": str,
+            "right": str,
+            "comment": str
+        }
+    ],
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
     justification_depth="brief",
 )
+
 
 
 def extract_concepts(pdf_file, show_prompt=False):
