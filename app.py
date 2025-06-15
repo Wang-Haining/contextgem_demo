@@ -15,11 +15,23 @@ This pipeline supports local fully-private deployment.
 Usage:
 ```bash
 # init backend llama3.1 (on a v100)
-python3 -m vllm.entrypoints.openai.api_server \
+# on Quartz
+source .venv/bin/activation
+
+# init backend llm
+OMP_NUM_THREADS=1 python -m vllm.entrypoints.openai.api_server \
     --model meta-llama/Llama-3.1-8B-Instruct \
     --dtype float16 \
     --tensor-parallel-size 1 \
     --max-model-len 16384
+
+# init gradio interface
+python app.py
+
+# local terminal
+ssh -J hw56@quartz.uits.iu.edu hw56@g13.quartz.uits.iu.edu -L 7860:localhost:7860
+
+
 
 ```
 
@@ -106,10 +118,9 @@ def extract_concepts(pdf_file, show_prompt=False):
 
     # connect contextgem to local vllm (openai-compatible api)
     llm = DocumentLLM(
-        model="llm-dummy",  # label only (ContextGem never uses this value to control routing)
-        api_key="sk-dummy",  # dummy (required by ContextGem's OpenAI interface wrapper)
-        api_base="http://localhost:8000/v1",  # local vLLM API endpoint
-        model_type="openai",  # use OpenAI-compatible chat completion format for llama3.1
+        model="vllm/meta-llama/Llama-3.1-8B-Instruct",
+        api_key="sk-dummy",
+        api_base="http://localhost:8000/v1"
     )
 
     # run extraction
