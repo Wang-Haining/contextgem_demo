@@ -32,7 +32,7 @@ __license__ = 'MIT'
 
 import gradio as gr
 import fitz  # pymupdf for robust pdf parsing
-from contextgem import Document, DocumentLLM, SegmentAndTagSegmenter, JsonObjectConcept
+from contextgem import Document, DocumentLLM, JsonObjectConcept
 
 
 def parse_pdf(pdf_file):
@@ -116,8 +116,6 @@ def extract_concepts(pdf_file, show_prompt=False):
 
     # initialize contextgem document and apply neural segmentation
     doc = Document(raw_text=text)
-    segmenter = SegmentAndTagSegmenter(model_name="sat-base")
-    doc = segmenter.segment(doc)
 
     # assign extraction concepts
     doc.concepts = [abc_concept, anat_concept, asymmetry_concept]
