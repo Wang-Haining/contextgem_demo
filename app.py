@@ -43,24 +43,21 @@ def parse_pdf(pdf_file):
 
 
 # define extraction concept: nia-aa abc staging
-abc_concept = JsonObjectConcept(
+staging_concept = JsonObjectConcept(
     name="ABC_Staging",
     description="Extract NIA‑AA ABC score: A (Aβ plaques), B (Braak stage), C (CERAD) and overall likelihood.",
     structure={
-        "type": "object",
-        "properties": {
-            "A": {"type": "integer", "minimum": 0, "maximum": 3},
-            "B": {"type": "integer", "minimum": 0, "maximum": 3},
-            "C": {"type": "integer", "minimum": 0, "maximum": 3},
-            "likelihood": {"type": "string"}
-        },
-        "required": ["A", "B", "C", "likelihood"]
+        "A": {"type": "integer", "minimum": 0, "maximum": 3},
+        "B": {"type": "integer", "minimum": 0, "maximum": 3},
+        "C": {"type": "integer", "minimum": 0, "maximum": 3},
+        "likelihood": {"type": "string"}
     },
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
     justification_depth="brief",
 )
+
 
 # define extraction concept: anatomical entities
 anat_concept = JsonObjectConcept(
@@ -69,20 +66,17 @@ anat_concept = JsonObjectConcept(
     structure={
         "type": "array",
         "items": {
-            "type": "object",
-            "properties": {
-                "term": {"type": "string"},
-                "fma_id": {"type": "string"},
-                "description": {"type": "string"}
-            },
-            "required": ["term", "fma_id", "description"],
-        },
+            "term": {"type": "string"},
+            "fma_id": {"type": "string"},
+            "description": {"type": "string"}
+        }
     },
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
     justification_depth="brief",
 )
+
 
 # define extraction concept: anatomical asymmetries
 asymmetry_concept = JsonObjectConcept(
@@ -91,21 +85,18 @@ asymmetry_concept = JsonObjectConcept(
     structure={
         "type": "array",
         "items": {
-            "type": "object",
-            "properties": {
-                "structure": {"type": "string"},
-                "left": {"type": "string"},
-                "right": {"type": "string"},
-                "comment": {"type": "string"}
-            },
-            "required": ["structure", "left", "right"],
-        },
+            "structure": {"type": "string"},
+            "left": {"type": "string"},
+            "right": {"type": "string"},
+            "comment": {"type": "string"}
+        }
     },
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
     justification_depth="brief",
 )
+
 
 
 def extract_concepts(pdf_file, show_prompt=False):
@@ -118,7 +109,7 @@ def extract_concepts(pdf_file, show_prompt=False):
     doc = Document(raw_text=text)
 
     # assign extraction concepts
-    doc.concepts = [abc_concept, anat_concept, asymmetry_concept]
+    doc.concepts = [staging_concept, anat_concept, asymmetry_concept]
 
     # connect contextgem to local vllm (openai-compatible api)
     llm = DocumentLLM(
