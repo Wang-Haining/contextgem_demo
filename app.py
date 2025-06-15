@@ -13,32 +13,25 @@ LLM backend: LLaMA 3.1 8B Instruct served via vLLM (OpenAI-compatible API).
 This pipeline supports local fully-private deployment.
 
 Usage:
-```bash
-# init backend llama3.1 (on a v100)
-# on Quartz
-source .venv/bin/activation
+# activate venv
+source .venv/bin/activate
 
-# init backend llm
+# start vllm backend
 OMP_NUM_THREADS=1 python -m vllm.entrypoints.openai.api_server \
     --model meta-llama/Llama-3.1-8B-Instruct \
     --dtype float16 \
     --tensor-parallel-size 1 \
     --max-model-len 16384
 
-# init gradio interface
+# start gradio interface
 python app.py
 
-# local terminal
+# ssh tunnel for browser access
 ssh -J hw56@quartz.uits.iu.edu hw56@g13.quartz.uits.iu.edu -L 7860:localhost:7860
-
-
-
-```
-
 """
 
 __author__ = "hw56@iu.edu"
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 __license__ = "MIT"
 
 
@@ -70,8 +63,7 @@ staging_concept = JsonObjectConcept(
     justification_depth="brief",
 )
 
-
-# define extraction concept: anatomical entities
+# anatomical entities
 anat_concept = JsonObjectConcept(
     name="Anatomical_Entities",
     description="List anatomical structures with FMA ID and description.",
@@ -86,8 +78,7 @@ anat_concept = JsonObjectConcept(
     justification_depth="brief",
 )
 
-
-# define extraction concept: anatomical asymmetries
+# anatomical asymmetries
 asymmetry_concept = JsonObjectConcept(
     name="Anatomical_Asymmetries",
     description="Extract all mentions of anatomical asymmetries (left vs right, hemisphere differences, side-specific findings).",
@@ -104,17 +95,21 @@ asymmetry_concept = JsonObjectConcept(
 )
 
 
-def extract_concepts(pdf_file, show_prompt=False):
-    """full pipeline: parse pdf → segment → extract → format results."""
+def extract_concepts(pdf_file, extraction_target):
+    """full pipeline: parse pdf → extract → format results."""
 
     # parse pdf content
     text = parse_pdf(pdf_file)
-
-    # initialize contextgem document and apply neural segmentation
     doc = Document(raw_text=text)
 
-    # assign extraction concepts
-    doc.concepts = [staging_concept, anat_concept, asymmetry_concept]
+    # dynamically select concept(s)
+    concept_map = {
+        "ABC Staging": [staging_concept],
+        "Anatomical Entities": [anat_concept],
+        "Anatomical Asymmetries": [asymmetry_concept],
+        "All": [staging_concept, anat_concept, asymmetry_concept],
+    }
+    doc.concepts = concept_map[extraction_target]
 
     # connect contextgem to local vllm (openai-compatible api)
     llm = DocumentLLM(
@@ -123,58 +118,46 @@ def extract_concepts(pdf_file, show_prompt=False):
         api_base="http://localhost:8000/v1"
     )
 
-    # run extraction
     doc = llm.extract_all(doc)
-
-    # format results for output
     output = ""
 
-    # abc staging results
-    abc_items = doc.get_concept_by_name("ABC_Staging").extracted_items
-    if abc_items:
-        abc = abc_items[0]
-        val = abc.value
-        output += f"ABC Staging:\nA: {val['A']}, B: {val['B']}, C: {val['C']}, Likelihood: {val['likelihood']}\n"
-        output += f"Justification: {abc.justification}\n"
-        for ref in abc.references:
-            output += f"Source: {ref.text}\n"
+    if extraction_target in ["ABC Staging", "All"]:
+        abc_items = doc.get_concept_by_name("ABC_Staging").extracted_items
+        if abc_items:
+            abc = abc_items[0]
+            val = abc.value
+            output += f"ABC Staging:\nA: {val['A']}, B: {val['B']}, C: {val['C']}, Likelihood: {val['likelihood']}\n"
+            output += f"Justification: {abc.justification}\n"
+            for ref in abc.references:
+                output += f"Source: {ref.text}\n"
+            output += "\n"
+
+    if extraction_target in ["Anatomical Entities", "All"]:
+        anat_items = doc.get_concept_by_name("Anatomical_Entities").extracted_items
+        output += "Anatomical Entities:\n"
+        for item in anat_items:
+            val = item.value
+            output += f"- {val['term']} (FMA: {val['fma_id']}): {val['description']}\n"
+            output += f"  Justification: {item.justification}\n"
+            for ref in item.references:
+                output += f"  Source: {ref.text}\n"
         output += "\n"
 
-    # anatomical entities results
-    anat_items = doc.get_concept_by_name("Anatomical_Entities").extracted_items
-    output += "Anatomical Entities:\n"
-    for item in anat_items:
-        val = item.value
-        output += f"- {val['term']} (FMA: {val['fma_id']}): {val['description']}\n"
-        output += f"  Justification: {item.justification}\n"
-        for ref in item.references:
-            output += f"  Source: {ref.text}\n"
-    output += "\n"
-
-    # anatomical asymmetries results
-    asymmetry_items = doc.get_concept_by_name("Anatomical_Asymmetries").extracted_items
-    output += "Anatomical Asymmetries:\n"
-    for item in asymmetry_items:
-        val = item.value
-        output += (
-            f"- Structure: {val['structure']}\n"
-            f"  Left: {val['left']}\n"
-            f"  Right: {val['right']}\n"
-            f"  Comment: {val.get('comment','')}\n"
-            f"  Justification: {item.justification}\n"
-        )
-        for ref in item.references:
-            output += f"  Source: {ref.text}\n"
-    output += "\n"
-
-    # optionally display full llm prompts used internally
-    if show_prompt:
-        internal = doc._internal_metadata.get("last_chat_prompts", [])
-        if internal:
-            full_prompts = "\n".join(f"[{p.role}] {p.content}" for p in internal)
-            output += "\n\nLLM Prompts:\n" + full_prompts
-        else:
-            output += "\n\n[No prompt metadata available]"
+    if extraction_target in ["Anatomical Asymmetries", "All"]:
+        asymmetry_items = doc.get_concept_by_name("Anatomical_Asymmetries").extracted_items
+        output += "Anatomical Asymmetries:\n"
+        for item in asymmetry_items:
+            val = item.value
+            output += (
+                f"- Structure: {val['structure']}\n"
+                f"  Left: {val['left']}\n"
+                f"  Right: {val['right']}\n"
+                f"  Comment: {val.get('comment','')}\n"
+                f"  Justification: {item.justification}\n"
+            )
+            for ref in item.references:
+                output += f"  Source: {ref.text}\n"
+        output += "\n"
 
     return output
 
@@ -184,13 +167,13 @@ gr.Interface(
     fn=extract_concepts,
     inputs=[
         gr.File(label="upload neuropathology pdf"),
-        gr.Checkbox(label="show llm prompt chain", value=False),
+        gr.Dropdown(
+            choices=["ABC Staging", "Anatomical Entities", "Anatomical Asymmetries", "All"],
+            label="Extraction Target",
+            value="ABC Staging"
+        ),
     ],
     outputs=gr.Textbox(label="extraction result", lines=40),
     title="Demo: Neuropathology Report Concept Extraction",
-    description=(
-        "upload a neuropathology report pdf. "
-        "extract nia-aa abc staging, anatomical structures, and anatomical asymmetries "
-        "using contextgem with llama 3.1-8b instruct served locally via vllm."
-    ),
+    description="Upload PDF. Extract ABC staging, anatomical structures, or asymmetries using ContextGem + vLLM."
 ).launch()
