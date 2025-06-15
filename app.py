@@ -46,7 +46,7 @@ def parse_pdf(pdf_file):
 abc_concept = JsonObjectConcept(
     name="ABC_Staging",
     description="Extract NIA‑AA ABC score: A (Aβ plaques), B (Braak stage), C (CERAD) and overall likelihood.",
-    json_schema={
+    structure={
         "type": "object",
         "properties": {
             "A": {"type": "integer", "minimum": 0, "maximum": 3},
@@ -66,7 +66,7 @@ abc_concept = JsonObjectConcept(
 anat_concept = JsonObjectConcept(
     name="Anatomical_Entities",
     description="List anatomical structures with FMA ID and description.",
-    json_schema={
+    structure={
         "type": "array",
         "items": {
             "type": "object",
@@ -88,7 +88,7 @@ anat_concept = JsonObjectConcept(
 asymmetry_concept = JsonObjectConcept(
     name="Anatomical_Asymmetries",
     description="Extract all mentions of anatomical asymmetries (left vs right, hemisphere differences, side-specific findings).",
-    json_schema={
+    structure={
         "type": "array",
         "items": {
             "type": "object",
