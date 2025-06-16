@@ -31,7 +31,7 @@ ssh -J hw56@quartz.uits.iu.edu hw56@g13.quartz.uits.iu.edu -L 7860:localhost:786
 """
 
 __author__ = "hw56@iu.edu"
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 __license__ = "MIT"
 
 
