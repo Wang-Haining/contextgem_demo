@@ -115,9 +115,9 @@ def extract_concepts(pdf_file, extraction_target, show_prompt):
     # OPTIONAL: print what ContextGem actually sent to LLM
     prompt_debug_output = ""
     if show_prompt:
-        chat_request = doc._internal_metadata.get("last_chat_request")
-        if chat_request:
-            prompt_debug_output = json.dumps(chat_request.to_dict(), indent=2)
+        debug_data = doc.get_debug_data()
+        if debug_data and debug_data.last_chat_request:
+            prompt_debug_output = json.dumps(debug_data.last_chat_request.to_dict(), indent=2)
 
     # parse results
     output = ""
