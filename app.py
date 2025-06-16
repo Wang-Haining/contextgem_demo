@@ -35,6 +35,9 @@ __version__ = "0.0.2"
 __license__ = "MIT"
 
 
+import json
+import os
+
 import fitz
 import gradio as gr
 from contextgem import Document, DocumentLLM, JsonObjectConcept
@@ -51,43 +54,27 @@ def parse_pdf(pdf_file):
 staging_concept = JsonObjectConcept(
     name="ABC_Staging",
     description="Extract NIA‑AA ABC score: A (Aβ plaques), B (Braak stage), C (CERAD) and overall likelihood.",
-    structure={
-        "A": int,
-        "B": int,
-        "C": int,
-        "likelihood": str
-    },
+    structure={"A": int, "B": int, "C": int, "likelihood": str},
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
     justification_depth="brief",
 )
 
-# anatomical entities
 anat_concept = JsonObjectConcept(
     name="Anatomical_Entities",
     description="List anatomical structures with FMA ID and description.",
-    structure={
-        "term": str,
-        "fma_id": str,
-        "description": str
-    },
+    structure={"term": str, "fma_id": str, "description": str},
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
     justification_depth="brief",
 )
 
-# anatomical asymmetries
 asymmetry_concept = JsonObjectConcept(
     name="Anatomical_Asymmetries",
-    description="Extract all mentions of anatomical asymmetries (left vs right, hemisphere differences, side-specific findings).",
-    structure={
-        "structure": str,
-        "left": str,
-        "right": str,
-        "comment": str
-    },
+    description="Extract anatomical asymmetries.",
+    structure={"structure": str, "left": str, "right": str, "comment": str},
     add_references=True,
     reference_depth="sentences",
     add_justifications=True,
@@ -95,14 +82,26 @@ asymmetry_concept = JsonObjectConcept(
 )
 
 
-def extract_concepts(pdf_file, extraction_target):
-    """full pipeline: parse pdf → extract → format results."""
+# initialize fallback llm (OpenAI GPT-4o-mini)
+openai_api_key = os.getenv("OPENAI_API_KEY")
 
-    # parse pdf content
+fallback_llm = DocumentLLM(
+    model="openai/gpt-4o-2024-05-13",
+    api_key=openai_api_key,
+)
+
+# initialize primary llm (local vLLM llama3.1)
+primary_llm = DocumentLLM(
+    model="vllm/meta-llama/Llama-3.1-8B-Instruct",
+    api_base="http://localhost:8000/v1",
+    fallback_llm=fallback_llm,
+)
+
+
+def extract_concepts(pdf_file, extraction_target, show_prompt):
     text = parse_pdf(pdf_file)
     doc = Document(raw_text=text)
 
-    # dynamically select concept(s)
     concept_map = {
         "ABC Staging": [staging_concept],
         "Anatomical Entities": [anat_concept],
@@ -111,19 +110,17 @@ def extract_concepts(pdf_file, extraction_target):
     }
     doc.concepts = concept_map[extraction_target]
 
-    # connect contextgem to local vllm (openai-compatible api)
-    llm = DocumentLLM(
-        model="vllm/meta-llama/Llama-3.1-8B-Instruct",
-        api_key="sk-dummy",
-        api_base="http://localhost:8000/v1"
-    )
+    doc = primary_llm.extract_all(doc)
 
-    doc = llm.extract_all(doc)
+    # OPTIONAL: print what ContextGem actually sent to LLM
+    prompt_debug_output = ""
+    if show_prompt:
+        chat_request = doc._internal_metadata.get("last_chat_request")
+        if chat_request:
+            prompt_debug_output = json.dumps(chat_request.to_dict(), indent=2)
 
-    if hasattr(doc, "model_response_raw"):
-        print("RAW LLM OUTPUT:")
-        print(doc.model_response_raw)
-
+    # parse results
+    output = ""
 
     if extraction_target in ["ABC Staging", "All"]:
         abc_items = doc.get_concept_by_name("ABC_Staging").extracted_items
@@ -148,7 +145,9 @@ def extract_concepts(pdf_file, extraction_target):
         output += "\n"
 
     if extraction_target in ["Anatomical Asymmetries", "All"]:
-        asymmetry_items = doc.get_concept_by_name("Anatomical_Asymmetries").extracted_items
+        asymmetry_items = doc.get_concept_by_name(
+            "Anatomical_Asymmetries"
+        ).extracted_items
         output += "Anatomical Asymmetries:\n"
         for item in asymmetry_items:
             val = item.value
@@ -163,6 +162,10 @@ def extract_concepts(pdf_file, extraction_target):
                 output += f"  Source: {ref.text}\n"
         output += "\n"
 
+    # append prompt debugging output if requested
+    if show_prompt:
+        output += "\n" + "=" * 30 + "\nLLM Prompt Sent:\n" + prompt_debug_output
+
     return output
 
 
@@ -172,12 +175,18 @@ gr.Interface(
     inputs=[
         gr.File(label="upload neuropathology pdf"),
         gr.Dropdown(
-            choices=["ABC Staging", "Anatomical Entities", "Anatomical Asymmetries", "All"],
+            choices=[
+                "ABC Staging",
+                "Anatomical Entities",
+                "Anatomical Asymmetries",
+                "All",
+            ],
             label="Extraction Target",
-            value="ABC Staging"
+            value="ABC Staging",
         ),
+        gr.Checkbox(label="show full llm prompt", value=False),
     ],
     outputs=gr.Textbox(label="extraction result", lines=40),
     title="Demo: Neuropathology Report Concept Extraction",
-    description="Upload PDF. Extract ABC staging, anatomical structures, or asymmetries using ContextGem + vLLM."
+    description="Upload PDF. Extract concepts using ContextGem with llama3.1 local + GPT-4o backup.",
 ).launch()
