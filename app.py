@@ -31,26 +31,33 @@ ssh -J hw56@quartz.uits.iu.edu hw56@g13.quartz.uits.iu.edu -L 7860:localhost:786
 """
 
 __author__ = "hw56@iu.edu"
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 __license__ = "MIT"
-
 
 import json
 import os
-
 import fitz
 import gradio as gr
 from contextgem import Document, DocumentLLM, JsonObjectConcept
 
-
 def parse_pdf(pdf_file):
-    """extract raw text from pdf using pymupdf (more reliable for scientific pdfs)."""
     doc = fitz.open(pdf_file)
     text = "\n".join(page.get_text() for page in doc)
     return text
 
+# robust references getter
+def safe_references(item):
+    if hasattr(item, "references") and item.references:
+        return item.references
+    return []
 
-# define extraction concept: nia-aa abc staging
+# robust justification getter
+def safe_justification(item):
+    if hasattr(item, "justification") and item.justification:
+        return item.justification
+    return ""
+
+# extraction concepts
 staging_concept = JsonObjectConcept(
     name="ABC_Staging",
     description="Extract NIA‑AA ABC score: A (Aβ plaques), B (Braak stage), C (CERAD) and overall likelihood.",
@@ -81,22 +88,23 @@ asymmetry_concept = JsonObjectConcept(
     justification_depth="brief",
 )
 
+# load OpenAI key safely from env
+openai_key = os.getenv("OPENAI_API_KEY")
+if not openai_key:
+    raise ValueError("OPENAI_API_KEY not found in environment!")
 
-# initialize fallback llm (OpenAI GPT-4o-mini)
 fallback_llm = DocumentLLM(
     model="openai/gpt-4o-2024-05-13",
-    api_key=os.getenv("OPENAI_API_KEY"),
+    api_key=openai_key,
     api_base="https://api.openai.com/v1",
-    is_fallback=True
+    is_fallback=True,
 )
 
-# initialize primary llm (local vLLM llama3.1)
 primary_llm = DocumentLLM(
     model="vllm/meta-llama/Llama-3.1-8B-Instruct",
     api_base="http://localhost:8000/v1",
     fallback_llm=fallback_llm,
 )
-
 
 def extract_concepts(pdf_file, extraction_target, show_prompt):
     text = parse_pdf(pdf_file)
@@ -112,14 +120,13 @@ def extract_concepts(pdf_file, extraction_target, show_prompt):
 
     doc = primary_llm.extract_all(doc)
 
-    # OPTIONAL: print what ContextGem actually sent to LLM
     prompt_debug_output = ""
     if show_prompt:
-        debug_data = doc.get_debug_data()
-        if debug_data and debug_data.last_chat_request:
-            prompt_debug_output = json.dumps(debug_data.last_chat_request.to_dict(), indent=2)
+        if hasattr(doc, "_internal_metadata"):
+            chat_request = doc._internal_metadata.get("last_chat_request")
+            if chat_request:
+                prompt_debug_output = json.dumps(chat_request.to_dict(), indent=2)
 
-    # parse results
     output = ""
 
     if extraction_target in ["ABC Staging", "All"]:
@@ -128,8 +135,8 @@ def extract_concepts(pdf_file, extraction_target, show_prompt):
             abc = abc_items[0]
             val = abc.value
             output += f"ABC Staging:\nA: {val['A']}, B: {val['B']}, C: {val['C']}, Likelihood: {val['likelihood']}\n"
-            output += f"Justification: {abc.justification}\n"
-            for ref in abc.references:
+            output += f"Justification: {safe_justification(abc)}\n"
+            for ref in safe_references(abc):
                 output += f"Source: {ref.text}\n"
             output += "\n"
 
@@ -139,15 +146,13 @@ def extract_concepts(pdf_file, extraction_target, show_prompt):
         for item in anat_items:
             val = item.value
             output += f"- {val['term']} (FMA: {val['fma_id']}): {val['description']}\n"
-            output += f"  Justification: {item.justification}\n"
-            for ref in item.references:
+            output += f"  Justification: {safe_justification(item)}\n"
+            for ref in safe_references(item):
                 output += f"  Source: {ref.text}\n"
         output += "\n"
 
     if extraction_target in ["Anatomical Asymmetries", "All"]:
-        asymmetry_items = doc.get_concept_by_name(
-            "Anatomical_Asymmetries"
-        ).extracted_items
+        asymmetry_items = doc.get_concept_by_name("Anatomical_Asymmetries").extracted_items
         output += "Anatomical Asymmetries:\n"
         for item in asymmetry_items:
             val = item.value
@@ -156,37 +161,29 @@ def extract_concepts(pdf_file, extraction_target, show_prompt):
                 f"  Left: {val['left']}\n"
                 f"  Right: {val['right']}\n"
                 f"  Comment: {val.get('comment','')}\n"
-                f"  Justification: {item.justification}\n"
+                f"  Justification: {safe_justification(item)}\n"
             )
-            for ref in item.references:
+            for ref in safe_references(item):
                 output += f"  Source: {ref.text}\n"
         output += "\n"
 
-    # append prompt debugging output if requested
-    if show_prompt:
-        output += "\n" + "=" * 30 + "\nLLM Prompt Sent:\n" + prompt_debug_output
+    if show_prompt and prompt_debug_output:
+        output += "\n==============================\nLLM Prompt Sent:\n" + prompt_debug_output
 
     return output
 
-
-# build gradio interface
 gr.Interface(
     fn=extract_concepts,
     inputs=[
         gr.File(label="upload neuropathology pdf"),
         gr.Dropdown(
-            choices=[
-                "ABC Staging",
-                "Anatomical Entities",
-                "Anatomical Asymmetries",
-                "All",
-            ],
+            choices=["ABC Staging", "Anatomical Entities", "Anatomical Asymmetries", "All"],
             label="Extraction Target",
             value="ABC Staging",
         ),
         gr.Checkbox(label="show full llm prompt", value=False),
     ],
     outputs=gr.Textbox(label="extraction result", lines=40),
-    title="Demo: Neuropathology Report Concept Extraction",
-    description="Upload PDF. Extract concepts using ContextGem with llama3.1 local + GPT-4o backup.",
+    title="Demo: Neuropathology Report Extraction (Quartz-Stable)",
+    description="Upload PDF. Extract concepts using ContextGem with llama3.1 local + GPT-4o fallback.",
 ).launch()
