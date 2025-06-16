@@ -184,6 +184,6 @@ gr.Interface(
         gr.Checkbox(label="show full llm prompt", value=False),
     ],
     outputs=gr.Textbox(label="extraction result", lines=40),
-    title="Demo: Neuropathology Report Extraction (Quartz-Stable)",
+    title="Demo: Neuropathology Report Extraction",
     description="Upload PDF. Extract concepts using ContextGem with llama3.1 local + GPT-4o fallback.",
 ).launch()
