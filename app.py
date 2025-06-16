@@ -83,11 +83,11 @@ asymmetry_concept = JsonObjectConcept(
 
 
 # initialize fallback llm (OpenAI GPT-4o-mini)
-openai_api_key = os.getenv("OPENAI_API_KEY")
-
 fallback_llm = DocumentLLM(
     model="openai/gpt-4o-2024-05-13",
-    api_key=openai_api_key,
+    api_key=os.getenv("OPENAI_API_KEY"),
+    api_base="https://api.openai.com/v1",
+    is_fallback=True
 )
 
 # initialize primary llm (local vLLM llama3.1)
