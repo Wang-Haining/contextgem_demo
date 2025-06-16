@@ -119,7 +119,11 @@ def extract_concepts(pdf_file, extraction_target):
     )
 
     doc = llm.extract_all(doc)
-    output = ""
+
+    if hasattr(doc, "model_response_raw"):
+        print("RAW LLM OUTPUT:")
+        print(doc.model_response_raw)
+
 
     if extraction_target in ["ABC Staging", "All"]:
         abc_items = doc.get_concept_by_name("ABC_Staging").extracted_items
