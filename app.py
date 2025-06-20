@@ -16,6 +16,9 @@ Usage:
 # activate venv
 source .venv/bin/activate
 
+# if switch between gpus
+rm -rf ~/.cache/vllm/torch_compile_cache
+
 # start vllm backend
 # v100
 OMP_NUM_THREADS=1 python -m vllm.entrypoints.openai.api_server \
@@ -24,7 +27,7 @@ OMP_NUM_THREADS=1 python -m vllm.entrypoints.openai.api_server \
     --tensor-parallel-size 1 \
     --max-model-len 16384
 # h100
-python -m vllm.entrypoints.openai.api_server \
+OMP_NUM_THREADS=1 python -m vllm.entrypoints.openai.api_server \
     --model meta-llama/Llama-3.1-8B-Instruct \
     --dtype bfloat16 \
     --tensor-parallel-size 1
