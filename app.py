@@ -26,7 +26,10 @@ OMP_NUM_THREADS=1 python -m vllm.entrypoints.openai.api_server \
 # start gradio interface
 python app.py
 
-# ssh tunnel for browser access
+# ssh tunnel for browser access, depending on the allocated resource
+# gpu partition, v100
+ssh -J hw56@quartz.uits.iu.edu hw56@g13.quartz.uits.iu.edu -L 7860:localhost:7860
+# hopper partition, h100
 ssh -J hw56@quartz.uits.iu.edu hw56@g13.quartz.uits.iu.edu -L 7860:localhost:7860
 """
 
