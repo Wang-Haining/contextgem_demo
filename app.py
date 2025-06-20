@@ -39,7 +39,7 @@ python app.py
 # gpu partition, v100
 ssh -J hw56@quartz.uits.iu.edu hw56@g13.quartz.uits.iu.edu -L 7860:localhost:7860
 # hopper partition, h100
-ssh -J hw56@quartz.uits.iu.edu hw56@g13.quartz.uits.iu.edu -L 7860:localhost:7860
+ssh -J hw56@quartz.uits.iu.edu hw56@g29.quartz.uits.iu.edu -L 7860:localhost:7860
 """
 
 __author__ = "hw56@iu.edu"
